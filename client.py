@@ -31,10 +31,36 @@ port = 6060
 
 
 
+def uploadeditems():
+    ctk.set_appearance_mode("dark")
+    ctk.set_default_color_theme("dark-blue")
+    root = ctk.CTk()
+    root.title("Uploaded items")
+    root.geometry("500x500")
+
+    frame3 = ctk.CTkFrame(master=root)
+    frame3.place(height=250, width=500)
+    frame3.pack(pady=20, padx=60, fill="both", expand=True)
+    label3 = ctk.CTkLabel(master=frame3, text="Uploaded files")
+    label3.pack(pady=12, padx=10)
+
+
+    with FTP(host) as ftp:
+        ftp.connect(host=host, port=port)
+        ftp.login(user=username_entry.get(), passwd=password_entry.get())
+        fileitems= ftp.nlst()
+        for i in fileitems:
+            print(i)
+            itemlabel = ctk.CTkLabel(master=frame3, text=i, width=480, height=30, corner_radius=10, fg_color="#1c4966")
+            itemlabel.place(relx=0.5, rely=0.5, anchor=ctk.W)
+            itemlabel.pack(pady=5, padx=10)
+
+    root.mainloop()
 
 
 
 def upload():
+
     with FTP(host) as ftp:
         ftp.connect(host=host, port=port)
         ftp.login(user=username_entry.get(), passwd=password_entry.get())
@@ -45,7 +71,9 @@ def upload():
         filename = os.path.basename(file)
         ftp.storbinary("STOR " + filename, fileobj)
 
+        uploadeditems()
         ftp.quit()
+    root.mainloop()
 
 
 
@@ -61,16 +89,20 @@ def fileuploadGUI():
     label = ctk.CTkLabel(master=frame2, text="Secure Upload")
     label.pack(pady=12, padx=10)
 
-    # select file btn
-    #select_button = ctk.CTkButton(master=frame2, text="Select File", command= selectfile)
-    #select_button.pack(pady=12, padx=10)
 
-
-    #upload file btn
-    secureupld_button = ctk.CTkButton(master=frame2, text="Secure Upload", command= upload)
+    # upload file btn
+    secureupld_button = ctk.CTkButton(master=frame2, text="Secure Upload", command=upload)
     secureupld_button.pack(pady=12, padx=10)
 
+
+
+
     root.mainloop()
+
+
+
+
+
 
 
 
