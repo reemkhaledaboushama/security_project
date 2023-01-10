@@ -1,7 +1,24 @@
 import customtkinter as ctk
+from ftplib import FTP
 
+def fileuploadGUI():
+    root = ctk.CTk()
+    root.geometry("500x500")
+    frame2 = ctk.CTkFrame(master=root)
+    frame2.pack(pady=20, padx=60, fill="both", expand=True)
+    label = ctk.CTkLabel(master=frame2, text="Secure Upload")
+    label.pack(pady=12, padx=10)
 
-def initGUI():
+    #upload file btn
+    secureupld_button = ctk.CTkButton(master=frame2, text="Secure Upload")
+    secureupld_button.pack(pady=12, padx=10)
+
+    # select file btn
+    select_button = ctk.CTkButton(master=frame2, text="select file")
+    select_button.pack(pady=12, padx=10)
+    root.mainloop()
+
+def loginGUI():
     ctk.set_appearance_mode("dark")
     ctk.set_default_color_theme("dark-blue")
 
@@ -19,7 +36,15 @@ def initGUI():
     password_entry = ctk.CTkEntry(master=frame1, placeholder_text="Enter Password", show="*")
     password_entry.pack(pady=12, padx=10)
 
+    login_button = ctk.CTkButton(master=frame1, text="Join ftp server", command=fileuploadGUI)
+    login_button.pack(pady=12, padx=10)
+
     root.mainloop()
+    return username_entry, password_entry
+
+username_entry , password_entry = loginGUI()
 
 
-initGUI()
+
+
+loginGUI()
