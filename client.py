@@ -1,6 +1,16 @@
+import os.path
+
 import customtkinter as ctk
 from ftplib import FTP
+from customtkinter import filedialog
 
+def selectfile():
+    filepath= filedialog.askopenfilename()
+    filename= os.path.basename(filepath)
+
+    print(filepath)
+    print(filename)
+    return filename
 def fileuploadGUI():
     root = ctk.CTk()
     root.geometry("500x500")
@@ -9,14 +19,18 @@ def fileuploadGUI():
     label = ctk.CTkLabel(master=frame2, text="Secure Upload")
     label.pack(pady=12, padx=10)
 
+    # select file btn
+    select_button = ctk.CTkButton(master=frame2, text="Select File", command= selectfile)
+    select_button.pack(pady=12, padx=10)
+
+
     #upload file btn
     secureupld_button = ctk.CTkButton(master=frame2, text="Secure Upload")
     secureupld_button.pack(pady=12, padx=10)
 
-    # select file btn
-    select_button = ctk.CTkButton(master=frame2, text="select file")
-    select_button.pack(pady=12, padx=10)
+
     root.mainloop()
+
 
 def loginGUI():
     ctk.set_appearance_mode("dark")
