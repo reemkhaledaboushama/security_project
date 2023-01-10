@@ -28,13 +28,27 @@ host = "127.0.0.1"
 port = 6060
 
 
-def selectfile():
-    filepath= filedialog.askopenfilename()
-    filename= os.path.basename(filepath)
 
-    print(filepath)
-    print(filename)
-    return filename
+
+
+
+
+def upload():
+    with FTP(host) as ftp:
+        ftp.connect(host=host, port=port)
+        ftp.login(user=username_entry.get(), passwd=password_entry.get())
+
+        file = filedialog.askopenfilename()
+        fileobj=open(file, "rb")
+
+        filename = os.path.basename(file)
+        ftp.storbinary("STOR " + filename, fileobj)
+
+        ftp.quit()
+
+
+
+
 def fileuploadGUI():
     ctk.set_appearance_mode("dark")
     ctk.set_default_color_theme("dark-blue")
@@ -46,16 +60,17 @@ def fileuploadGUI():
     label.pack(pady=12, padx=10)
 
     # select file btn
-    select_button = ctk.CTkButton(master=frame2, text="Select File", command= selectfile)
-    select_button.pack(pady=12, padx=10)
+    #select_button = ctk.CTkButton(master=frame2, text="Select File", command= selectfile)
+    #select_button.pack(pady=12, padx=10)
 
 
     #upload file btn
-    secureupld_button = ctk.CTkButton(master=frame2, text="Secure Upload")
+    secureupld_button = ctk.CTkButton(master=frame2, text="Secure Upload", command= upload)
     secureupld_button.pack(pady=12, padx=10)
 
-
     root.mainloop()
+
+
 
 def accessFTP():
     with FTP(host) as ftp:
