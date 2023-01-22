@@ -133,7 +133,7 @@ def upload():
         ftp.connect(host=host, port=port)
         ftp.login(user=username_entry.get(), passwd=password_entry.get())
 
-        file = filedialog.askopenfilename(initialdir="D:\\semester9\\security_project\\security_project")
+        file = filedialog.askopenfilename(initialdir="D:\\semester9\\security_project\\security_project") #u can change this to your own default directory or remove it at all
         fileobj=open(file, "rb")
 
         filename = os.path.basename(file)
