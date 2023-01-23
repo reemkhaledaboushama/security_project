@@ -48,6 +48,7 @@ def uploadeditems():
     with FTP() as ftp:
         ftp.connect(host=host, port=port)
         ftp.login(user, password)
+        #ftp.cwd("/uploaded")
         fileitems = ftp.nlst()
         for i in fileitems:
             print(i)
@@ -60,7 +61,6 @@ def uploadeditems():
 def chooseGUI():
     ctk.set_appearance_mode("dark")
     ctk.set_default_color_theme("dark-blue")
-    #root = ctk.CTk()
     root.title("Upload or Download")
     root.geometry("500x500")
     global frame
@@ -81,12 +81,21 @@ def download(combox):
     with FTP() as ftp:
         ftp.connect(host=host, port=port)
         ftp.login(user, password)
+        #ftp.cwd("/uploaded")
         with open(val, "wb") as file:
 
             ftp.retrbinary(f"RETR {val}", file.write)
             # quit and close the connection
         ftp.quit()
-    decrypt_DES(val)
+        
+    file_in = open(val, "rb")
+    ciphertext = file_in.read()
+    print(ciphertext)
+    plaintext = decrypt_DES(nonce, ciphertext, tag)
+    print(plaintext)
+    file_out = open("decrypt_"+val, "w")
+    file_out.write(plaintext)
+    file_out.close()
 
 
 
@@ -108,6 +117,7 @@ def filedownloadGUI():
     with FTP() as ftp:
         ftp.connect(host=host, port=port)
         ftp.login(user, password)
+        #ftp.cwd("/uploaded")
         fileitems = ftp.nlst()
 
     combobox = ctk.CTkOptionMenu(master=frame, values=fileitems)
@@ -143,7 +153,6 @@ def create_keys():
 
 
 def encrypt_AES(filepath):
-    #data = b'secret data'
     fileobj=open(filepath, "rb")
     global AES_key
     cipher = AES.new(AES_key, AES.MODE_EAX)
@@ -154,37 +163,9 @@ def encrypt_AES(filepath):
     [ file_out.write(x) for x in (cipher.nonce, tag, ciphertext) ]
     file_out.close()
 
-def encrypt_DES(filepath):
-    #data = b'secret data'
-    fileobj=open(filepath, "rb")
-    
-    global DES_key
-
-    plain_text=fileobj.read()
-    cipher = DES.new(DES_key, DES.MODE_EAX)
-    ciphertext = cipher.encrypt(pad(plain_text, 8))
-
-    filename=os.path.basename(filepath)
-    file_out = open("encrypted_"+filename, "wb")
-    
-    file_out.write(ciphertext)
-    file_out.close()
-
-def encrypt_DES3(filepath):
-    #data = b'secret data'
-    fileobj=open(filepath, "rb")
-
-    global DES3_key
-    cipher = DES3.new(DES3_key, DES3.MODE_EAX)
-    ciphertext, tag = cipher.encrypt_and_digest(fileobj.read())
-
-    filename=os.path.basename(filepath)
-    file_out = open("encrypted_"+filename, "wb")
-    [ file_out.write(x) for x in (cipher.nonce, tag, ciphertext) ]
-    file_out.close()
 
 def decrypt_AES(filename):
-    file_in = open(filename, "rb")
+    file_in = open("encrypted_"+filename, "rb")
     nonce, tag, ciphertext = [ file_in.read(x) for x in (16, 16, -1) ]
 
     cipher = AES.new(AES_key, AES.MODE_EAX, nonce)
@@ -193,44 +174,33 @@ def decrypt_AES(filename):
     file_out.write(data.decode("utf-8"))
     file_out.close()
 
-def decrypt_DES(filename):
-    file_in = open(filename, "rb")
-    nonce, tag, ciphertext = [ file_in.read(x) for x in (16, 16, -1) ]
-    #ciphertext=file_in.read()
 
-    cipher = DES.new(DES_key, DES.MODE_EAX)
-    data = cipher.decrypt(ciphertext)
-    file_out = open("decrypt_"+filename, "w")
-    str=unpad(data, 8)
-    file_out.write(str.decode("utf-8"))
-    file_out.close()
-
-def decrypt_DES3(filename):
-    file_in = open(filename, "rb")
-    nonce, tag, ciphertext = [ file_in.read(x) for x in (16, 16, -1) ]
-
-    cipher = DES3.new(DES3_key, DES3.MODE_EAX, nonce)
-    data = cipher.decrypt_and_verify(ciphertext, tag)
-    file_out = open("decrypt_"+filename, "w")
-    file_out.write(data)
-    file_out.close()
 
 def upload():
     
     with FTP() as ftp:
         ftp.connect(host=host, port=port)
         ftp.login(user, password)
-
-        filepath = filedialog.askopenfilename() #u can change this to your own default directory or remove it at all
+        filepath = filedialog.askopenfilename(initialdir="C:\\Users\\olaal\\OneDrive\\Documents\\Sem 9\\Networks Security\\Project") #u can change this to your own default directory or remove it at all
         filename=os.path.basename(filepath)
         create_keys()
-        encrypt_DES(filepath)
-      
+        
+        fileobj=open(filepath, "r")
+        plain_text=fileobj.read()
+        global nonce
+        global tag
+        nonce, ciphertext, tag = encrypt_DES(plain_text)
+       
+        filename=os.path.basename(filepath)
+        file_out = open("encrypted_"+filename, "wb")
+        file_out.write(ciphertext) 
+        file_out.close()
+   
+        fileobj=open("keys.txt", "rb")
+        ftp.storbinary("STOR " + "keys.txt", fileobj)
         fileobj=open("encrypted_"+filename, "rb")
         ftp.storbinary("STOR " + "encrypted_"+filename, fileobj)
 
-        fileobj=open("keys.txt", "rb")
-        ftp.storbinary("STOR " + "keys.txt", fileobj)
 
         uploadeditems()
         ftp.quit()
@@ -248,7 +218,6 @@ def fileuploadGUI():
 
 
 def accessFTP():
-    #with FTP(host=host) as ftp:
     ftp=FTP()
     global user
     user = username_entry.get()
@@ -267,6 +236,38 @@ def accessFTP():
     return user, password
 
 
+def encrypt_DES(msg):
+    cipher = DES.new(DES_key, DES.MODE_EAX)
+    nonce = cipher.nonce
+    ciphertext, tag = cipher.encrypt_and_digest(msg.encode('ascii'))
+    return nonce, ciphertext, tag
+
+def decrypt_DES(nonce, ciphertext, tag):
+    cipher = DES.new(DES_key, DES.MODE_EAX, nonce=nonce)
+    plaintext = cipher.decrypt(ciphertext)
+
+    try:
+        cipher.verify(tag)
+        return plaintext.decode('ascii')
+    except:
+        return False
+
+
+def encrypt_DES3(msg):
+    cipher = DES3.new(DES3_key, DES3.MODE_EAX)
+    nonce = cipher.nonce
+    ciphertext, tag = cipher.encrypt_and_digest(msg.encode('ascii'))
+    return nonce, ciphertext, tag
+
+def decrypt_DES3(nonce, ciphertext, tag):
+    cipher = DES3.new(DES3_key, DES3.MODE_EAX, nonce=nonce)
+    plaintext = cipher.decrypt(ciphertext)
+
+    try:
+        cipher.verify(tag)
+        return plaintext.decode('ascii')
+    except:
+        return False
 
 
 
