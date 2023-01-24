@@ -5,7 +5,7 @@ from customtkinter import filedialog
 from Crypto.Cipher import AES, DES, DES3
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
-
+CHUNK_SIZE = 16
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
 
@@ -48,7 +48,6 @@ def uploadeditems():
     with FTP() as ftp:
         ftp.connect(host=host, port=port)
         ftp.login(user, password)
-        #ftp.cwd("/uploaded")
         fileitems = ftp.nlst()
         for i in fileitems:
             print(i)
@@ -77,28 +76,60 @@ def chooseGUI():
 
 def download(combox):
     val = combox
-    print(val)
     with FTP() as ftp:
         ftp.connect(host=host, port=port)
         ftp.login(user, password)
-        #ftp.cwd("/uploaded")
         with open(val, "wb") as file:
 
             ftp.retrbinary(f"RETR {val}", file.write)
-            # quit and close the connection
         ftp.quit()
         
     file_in = open(val, "rb")
     ciphertext = file_in.read()
-    print(ciphertext)
-    plaintext = decrypt_DES(nonce, ciphertext, tag)
-    print(plaintext)
-    file_out = open("decrypt_"+val, "w")
-    file_out.write(plaintext)
+
+    masterkey_file_out=open("master_key.txt","rb")
+    master_key=masterkey_file_out.read()
+    cipher = AES.new(master_key, AES.MODE_ECB)
+
+    file_out = open("keys.txt", "rb")
+    cipherkey=file_out.read()
+    plainkey = cipher.decrypt(cipherkey)
     file_out.close()
 
+    file_in = open("keys.txt", "wb")
+    file_in.write(plainkey)
+    file_in.close()
 
-
+    keys_file_in=open("keys.txt","rb")
+    global AES_key_internal
+    global DES3_key_internal
+    global DES_key_internal
+    AES_key_internal=keys_file_in.read(16)
+    DES3_key_internal=keys_file_in.read(16)
+    DES_key_internal=keys_file_in.read(8)
+    keys_file_in.close()
+    
+    file_number=0
+    file_out = open(val, "rb")
+    with open("decrypt_"+val, "wb") as file_in :
+        while True:
+            cipher_text_chunck=file_out.read(CHUNK_SIZE)
+            if len(cipher_text_chunck) == 0:
+                break
+            elif len(cipher_text_chunck) % 16 !=0:
+                cipher_text_chunck += ' ' * (16 - len(cipher_text_chunck) % 16)
+            
+            plaintext_chunk = round_robin_decrypt(cipher_text_chunck, file_number)
+            #print("upload")
+            
+            file_in.write(plaintext_chunk) 
+            #ciphertext +=ciphertext_chunk
+            #print(file_number)
+            file_number += 1
+            #plain_text_chunck = fileobj.read(CHUNK_SIZE)    
+            
+        file_out.close()
+    
 def filedownloadGUI():
     
     ctk.set_appearance_mode("dark")
@@ -125,56 +156,50 @@ def filedownloadGUI():
     selected=combobox.get()
     download_button = ctk.CTkButton(master=frame, text="Download", command=lambda: download(selected))
     download_button.pack(pady=12, padx=10)
-
     home_button = ctk.CTkButton(master=frame, text="Home", command=lambda: chooseGUI())
     home_button.pack(pady=12, padx=10)
 
     root.mainloop()
-
-AES_key = get_random_bytes(0)
-DES_key = get_random_bytes(0)
-DES_key = get_random_bytes(0)
 
 def create_keys():
     global AES_key
     global DES_key
     global DES3_key
     AES_key = get_random_bytes(16)
-    DES_key = get_random_bytes(8)
     DES3_key = get_random_bytes(16)
+    DES_key = get_random_bytes(8)
+    
     file_out = open("keys.txt", "wb")
-    str="\n"
     file_out.write(AES_key)
-    file_out.write(str.encode("utf-8"))
-    file_out.write(DES_key)
-    file_out.write(str.encode("utf-8"))
     file_out.write(DES3_key)
+    file_out.write(DES_key)
+    file_out.write(b'        ')
     file_out.close()
 
-
-def encrypt_AES(filepath):
-    fileobj=open(filepath, "rb")
-    global AES_key
-    cipher = AES.new(AES_key, AES.MODE_EAX)
-    ciphertext, tag = cipher.encrypt_and_digest(fileobj.read())
-
-    filename=os.path.basename(filepath)
-    file_out = open("encrypted_"+filename, "wb")
-    [ file_out.write(x) for x in (cipher.nonce, tag, ciphertext) ]
-    file_out.close()
-
-
-def decrypt_AES(filename):
-    file_in = open("encrypted_"+filename, "rb")
-    nonce, tag, ciphertext = [ file_in.read(x) for x in (16, 16, -1) ]
-
-    cipher = AES.new(AES_key, AES.MODE_EAX, nonce)
-    data = cipher.decrypt_and_verify(ciphertext, tag)
-    file_out = open("decrypt_"+filename, "w")
-    file_out.write(data.decode("utf-8"))
-    file_out.close()
+def encrypt_AES(msg):
+    #fileobj=open(filepath, "rb")
+    
+    cipher = AES.new(AES_key, AES.MODE_ECB)
+    print("plaintext")
+    print(msg)
+    ciphertext = cipher.encrypt(msg.encode("utf-8"))
+    print("ciphertext")
+    print(ciphertext)
+    
+    return ciphertext
 
 
+def decrypt_AES(ciphertext):
+    
+    print(ciphertext)
+    print(ciphertext)
+    cipher = AES.new(AES_key_internal, AES.MODE_ECB)
+    
+    data = cipher.decrypt(ciphertext)
+    print("plaintext")
+    print(data)
+
+    return data
 
 def upload():
     
@@ -184,38 +209,72 @@ def upload():
         filepath = filedialog.askopenfilename(initialdir="C:\\Users\\olaal\\OneDrive\\Documents\\Sem 9\\Networks Security\\Project") #u can change this to your own default directory or remove it at all
         filename=os.path.basename(filepath)
         create_keys()
+
+        file_number = 0
         
-        fileobj=open(filepath, "r")
-        plain_text=fileobj.read()
-        global nonce
-        global tag
-        nonce, ciphertext, tag = encrypt_DES(plain_text)
-       
+        ciphertext= b''
+        
         filename=os.path.basename(filepath)
         file_out = open("encrypted_"+filename, "wb")
-        file_out.write(ciphertext) 
+        with open(filepath, "r") as fileobj :
+            while True:
+                plain_text_chunck=fileobj.read(CHUNK_SIZE)
+                if len(plain_text_chunck) == 0:
+                    break
+                elif len(plain_text_chunck) % 16 !=0:
+                    plain_text_chunck += ' ' * (16 - len(plain_text_chunck) % 16)
+                
+                ciphertext_chunk = round_robin_encrypt(plain_text_chunck, file_number)
+                file_out.write(ciphertext_chunk) 
+                file_number += 1  
+                
         file_out.close()
-   
+
+        masterkey_file_in=open("master_key.txt","wb")
+        master_key=get_random_bytes(16)
+        masterkey_file_in.write(master_key)
+        masterkey_file_in.close()
+        cipher = AES.new(master_key, AES.MODE_ECB)
+        
+        file_out = open("keys.txt", "rb")
+        plaintext=file_out.read()
+        ciphertext = cipher.encrypt(plaintext)
+        file_out.close()
+
+        file_in = open("keys.txt", "wb")
+        file_in.write(ciphertext)
+        file_in.close()
+        
         fileobj=open("keys.txt", "rb")
         ftp.storbinary("STOR " + "keys.txt", fileobj)
+        fileobj.close()
         fileobj=open("encrypted_"+filename, "rb")
         ftp.storbinary("STOR " + "encrypted_"+filename, fileobj)
-
+        fileobj.close()
 
         uploadeditems()
         ftp.quit()
        
-    
-    
     root.mainloop()
 
+def round_robin_encrypt(plain_text_chunck, file_number):
+    if file_number%3 == 0:
+        return encrypt_AES(plain_text_chunck)
+    elif file_number%3 == 1:
+        return encrypt_DES3(plain_text_chunck)
+    elif file_number%3 == 2:
+        return encrypt_DES(plain_text_chunck)
 
-
+def round_robin_decrypt(cipher_text_chunck, file_number):
+    if file_number%3 == 0:
+        return decrypt_AES(cipher_text_chunck)
+    elif file_number%3 == 1:
+        return decrypt_DES3(cipher_text_chunck)
+    elif file_number%3 == 2:
+        return decrypt_DES(cipher_text_chunck)
 
 def fileuploadGUI():
    upload()
-
-
 
 def accessFTP():
     ftp=FTP()
@@ -226,53 +285,32 @@ def accessFTP():
     ftp.connect(host=host, port=port)
     ftp.login(user=user, passwd=password)
     login_response = ftp.login(user, password)
-    print(login_response)
-    print(ftp.getwelcome())
-    print(username_entry.get())
-    
-
     chooseGUI()
-
     return user, password
 
 
 def encrypt_DES(msg):
-    cipher = DES.new(DES_key, DES.MODE_EAX)
-    nonce = cipher.nonce
-    ciphertext, tag = cipher.encrypt_and_digest(msg.encode('ascii'))
-    return nonce, ciphertext, tag
+    cipher = DES.new(DES_key, DES.MODE_ECB)
+    ciphertext= cipher.encrypt(msg.encode('ascii'))
+    return ciphertext
 
-def decrypt_DES(nonce, ciphertext, tag):
-    cipher = DES.new(DES_key, DES.MODE_EAX, nonce=nonce)
+def decrypt_DES(ciphertext):
+    cipher = DES.new(DES_key_internal, DES.MODE_ECB)
     plaintext = cipher.decrypt(ciphertext)
-
-    try:
-        cipher.verify(tag)
-        return plaintext.decode('ascii')
-    except:
-        return False
+    return plaintext
 
 
 def encrypt_DES3(msg):
-    cipher = DES3.new(DES3_key, DES3.MODE_EAX)
-    nonce = cipher.nonce
-    ciphertext, tag = cipher.encrypt_and_digest(msg.encode('ascii'))
-    return nonce, ciphertext, tag
+    cipher = DES3.new(DES3_key, DES3.MODE_ECB)
+    ciphertext= cipher.encrypt(msg.encode('ascii'))
+    return ciphertext
 
-def decrypt_DES3(nonce, ciphertext, tag):
-    cipher = DES3.new(DES3_key, DES3.MODE_EAX, nonce=nonce)
+def decrypt_DES3(ciphertext):
+    cipher = DES3.new(DES3_key_internal, DES3.MODE_ECB)
     plaintext = cipher.decrypt(ciphertext)
-
-    try:
-        cipher.verify(tag)
-        return plaintext.decode('ascii')
-    except:
-        return False
-
-
-
+    return plaintext
+    
 login_button = ctk.CTkButton(master=frame, text="Join ftp server", command=accessFTP)
 login_button.pack(pady=12, padx=10)
-
 
 root.mainloop()
